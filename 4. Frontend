@@ -1,0 +1,3 @@
+npx create-react-app traffic-dashboard
+cd traffic-dashboard
+npm install axios chart.js react-chartjs-2
