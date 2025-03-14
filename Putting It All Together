@@ -1,0 +1,14 @@
+Database:
+Ensure PostgreSQL is running and the database is created. Run the SQL schema commands to set up tables.
+
+Backend:
+Start the Flask application (e.g., using python app.py). It listens on port 5000 and provides RESTful endpoints.
+
+Frontend:
+Start the React app. The dashboard fetches data from the backend and displays it using Chart.js.
+
+Data Flow:
+
+IoT sensors or simulation tools send sensor data via the /api/sensor-data endpoint.
+The backend stores the data and provides real-time aggregated data via /api/traffic-data.
+The React dashboard polls the backend and visualizes the data, while additional endpoints (like /api/predict-congestion) can be used to display predictive analytics.
