@@ -1,0 +1,109 @@
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+import datetime
+import hashlib
+
+app = Flask(__name__)
+CORS(app)  # Allow cross-origin requests from the frontend
+
+# Configure PostgreSQL connection (adjust URI accordingly)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/traffic_db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# Define the sensor_data model
+class SensorData(db.Model):
+    __tablename__ = 'sensor_data'
+    id = db.Column(db.Integer, primary_key=True)
+    sensor_id = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    vehicle_count = db.Column(db.Integer, nullable=False)
+    average_speed = db.Column(db.Float)
+    congestion_level = db.Column(db.Float)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'sensor_id': self.sensor_id,
+            'timestamp': self.timestamp.isoformat(),
+            'vehicle_count': self.vehicle_count,
+            'average_speed': self.average_speed,
+            'congestion_level': self.congestion_level,
+            'latitude': self.latitude,
+            'longitude': self.longitude
+        }
+
+# Define the traffic_events model
+class TrafficEvent(db.Model):
+    __tablename__ = 'traffic_events'
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text)
+    event_time = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    # For simplicity, storing location as latitude and longitude
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'event_type': self.event_type,
+            'description': self.description,
+            'event_time': self.event_time.isoformat(),
+            'latitude': self.latitude,
+            'longitude': self.longitude
+        }
+
+# Endpoint to submit sensor data
+@app.route('/api/sensor-data', methods=['POST'])
+def add_sensor_data():
+    data = request.json
+    try:
+        new_data = SensorData(
+            sensor_id=data['sensor_id'],
+            vehicle_count=data['vehicle_count'],
+            average_speed=data.get('average_speed', 0.0),
+            congestion_level=data.get('congestion_level', 0.0),
+            latitude=data.get('latitude', None),
+            longitude=data.get('longitude', None)
+        )
+        db.session.add(new_data)
+        db.session.commit()
+        return jsonify({'message': 'Sensor data added successfully'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+# Endpoint to retrieve aggregated sensor data (example: last 1 hour)
+@app.route('/api/traffic-data', methods=['GET'])
+def get_traffic_data():
+    one_hour_ago = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+    data = SensorData.query.filter(SensorData.timestamp >= one_hour_ago).all()
+    return jsonify([d.to_dict() for d in data])
+
+# Endpoint to retrieve traffic events
+@app.route('/api/traffic-events', methods=['GET'])
+def get_traffic_events():
+    events = TrafficEvent.query.order_by(TrafficEvent.event_time.desc()).all()
+    return jsonify([event.to_dict() for event in events])
+
+# Example endpoint for a machine learning prediction (pseudo-code)
+@app.route('/api/predict-congestion', methods=['GET'])
+def predict_congestion():
+    # In a real-world scenario, load your ML model and run predictions
+    # Here, we simply return a dummy prediction
+    prediction = {
+        'location': {'latitude': 37.7749, 'longitude': -122.4194},
+        'predicted_congestion': 0.8,  # e.g., 80% congestion
+        'prediction_time': datetime.datetime.utcnow().isoformat()
+    }
+    return jsonify(prediction)
+
+if __name__ == '__main__':
+    # Create tables if they do not exist
+    db.create_all()
+    app.run(debug=True, port=5000)
